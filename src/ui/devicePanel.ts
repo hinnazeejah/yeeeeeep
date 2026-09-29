@@ -75,7 +75,7 @@ export class DevicePanel {
       this.target.style.display = g.atRoot ? '' : 'none';
       this.target.setAttribute('transform', 'rotate(0)');
       let hint = '';
-      if (g.engaged) hint = 'Engaged. Select the guidewire (2).';
+      if (g.engaged) hint = d.stageIndex < 2 ? 'Engaged. Take an angiogram (5).' : 'Engaged. Select the guidewire (2).';
       else if (g.atRoot) hint = 'At the root: rotate until the tip faces the left cusp, then advance.';
       else if (g.inAorta) hint = 'Advance down the ascending aorta to the root.';
       else hint = 'Advance up the arm (W or wheel).';

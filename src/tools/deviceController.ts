@@ -20,6 +20,8 @@ export class DeviceController {
   readonly guide: GuideCatheter;
   readonly wire: Guidewire;
   activeTool: ToolId = 'guide';
+  /** Current procedure stage, set by the app each frame (used for tool rules). */
+  stageIndex = 0;
   onFeedback: (f: Feedback) => void = () => {};
 
   private readonly guideTube: DeviceTube;

@@ -25,6 +25,8 @@ export interface ToolDef {
 export interface ToolContext {
   guide: GuideCatheter;
   wire: Guidewire;
+  /** Current procedure stage (0-based). Tools unlock as stages are completed. */
+  stageIndex: number;
 }
 
 const svgCursor = (body: string, hx = 12, hy = 12, fallback = 'crosshair'): string =>
@@ -63,7 +65,7 @@ export const TOOLS: ToolDef[] = [
     cursor: svgCursor(ring('#e6edf2') + `<path d='M12 7l3-3' stroke='#e6edf2' stroke-width='1.5'/>`),
     icon: icon('<path d="M3 21c5-2 7-6 9-10s4-7 7-7"/><path d="M19 4l2-1"/>'),
     rules: [
-      'Requires the guide engaged in the left main.',
+      'Requires the guide engaged in the left main and a diagnostic angiogram.',
       'W/S or wheel: advance / retract. A/D: rotate the shaped tip.',
       'At each branch the tip direction picks the vessel. Watch the panel hint and the fluoro image.',
       'Cross the lesion slowly (Shift). Forcing a buckling wire can dissect the artery.',
@@ -134,7 +136,9 @@ export function toolAvailability(id: ToolId, ctx: ToolContext): { ok: boolean; r
     case 'fluoro':
       return { ok: true };
     case 'wire':
-      return ctx.guide.engaged ? { ok: true } : { ok: false, reason: 'Engage the left main with the guide catheter first.' };
+      if (!ctx.guide.engaged) return { ok: false, reason: 'Engage the left main with the guide catheter first.' };
+      if (ctx.stageIndex < 2) return { ok: false, reason: 'Take a diagnostic angiogram (5) first, so you can see where you are going.' };
+      return { ok: true };
     case 'contrast':
       return ctx.guide.inAorta ? { ok: true } : { ok: false, reason: 'The guide tip must be in the aorta to inject.' };
     case 'balloon':

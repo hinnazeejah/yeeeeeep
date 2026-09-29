@@ -374,7 +374,7 @@ export const DEVICES = {
   wire: {
     /** 0.014" coronary guidewire = 0.36 mm diameter (drawn slightly thicker so it stays visible). */
     radius: 0.18,
-    visualRadius: 0.3,
+    visualRadius: 0.4,
     /** Radiopaque distal segment, mm. */
     tipOpaqueMm: 30,
     /** Small shaped bend at the tip used for steering, mm. */

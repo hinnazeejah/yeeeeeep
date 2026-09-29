@@ -65,6 +65,7 @@ export class Hud {
         <tr><td>V · arrows</td><td>C-arm projection / angle</td></tr>
         <tr><td>F</td><td>Camera follows device tip</td></tr>
         <tr><td>L</td><td>Anatomy labels</td></tr>
+        <tr><td>M</td><td>Collapse / expand the mentor</td></tr>
         <tr><td>Drag · Ctrl+wheel</td><td>Orbit / zoom (3D)</td></tr>
       </table>`;
     root.appendChild(this.help);

@@ -8,6 +8,11 @@ import { store } from './state/store';
 import { DeviceController } from './tools/deviceController';
 import { HoverPicker } from './tools/hover';
 import { TOOL_BY_KEY, TOOLS, type ToolId } from './tools/tools';
+import { Procedure } from './procedure/procedure';
+import { buildContext, ProcedureLog } from './procedure/snapshot';
+import { formatCArm } from './ui/hud';
+import { Checklist } from './ui/checklist';
+import { MentorPanel } from './ui/mentor';
 import { DevicePanel } from './ui/devicePanel';
 import { Hud } from './ui/hud';
 import { DeviceInput } from './ui/input';
@@ -21,11 +26,15 @@ const anatomy = new AnatomyModel(views.scene3d, views.sceneFluoro);
 const devices = new DeviceController(anatomy, views.scene3d, views.sceneFluoro);
 const bolus = new ContrastBolus();
 const input = new DeviceInput();
+const procedure = new Procedure();
+const log = new ProcedureLog();
 
 const hud = new Hud(document.body);
 const messages = new Messages(document.body);
 const panel = new DevicePanel(document.body, input);
 const hover = new HoverPicker(views.renderer.domElement, anatomy, devices);
+const checklist = new Checklist(document.body, procedure);
+const mentor = new MentorPanel(document.body, procedure);
 devices.onFeedback = (f) => messages.show(f);
 
 views.setCArm(store.state.carm);
@@ -48,6 +57,7 @@ function injectContrast(): void {
   const r = devices.inject(bolus);
   if (r.feedback) messages.show(r.feedback);
   if (r.ok) {
+    log.recordInjection(devices.guide.engaged, formatCArm(store.state.carm));
     store.set({ contrastMl: store.state.contrastMl + r.ml });
     if (store.state.view !== 'fluoro') store.set({ view: 'fluoro' });
   }
@@ -119,6 +129,9 @@ window.addEventListener('keydown', (e) => {
       store.set({ labelsVisible: !s.labelsVisible });
       anatomy.setLabelsVisible(store.state.labelsVisible);
       break;
+    case 'KeyM':
+      mentor.toggle();
+      break;
     case 'KeyH':
       hud.toggleHelp();
       break;
@@ -182,7 +195,22 @@ function frame(time: number): void {
   // X-rays are on while the pedal is held or during a cine run.
   const xrayOn = pedalDown || bolus.active;
   if (xrayOn !== s.xrayOn) store.set({ xrayOn });
-  if (xrayOn) s.fluoroSeconds += dt;
+  if (xrayOn) {
+    s.fluoroSeconds += dt;
+    log.recordFluoro(devices);
+  }
+
+  // Stage system.
+  const ctx = buildContext(devices, log);
+  for (const ev of procedure.update(ctx, s.elapsed)) {
+    if (ev.type === 'stage') {
+      checklist.flash(ev.stage);
+      messages.show({ text: `Stage ${ev.stage + 1} complete: ${ev.title}.`, level: 'ok' });
+    } else if (ev.type === 'complete') {
+      messages.show({ text: 'All stages complete.', level: 'ok' });
+    }
+  }
+  devices.stageIndex = procedure.current;
 
   // Camera follow: glide the orbit target (and the camera with it) towards the device tip.
   if (s.follow && s.view === '3d') {
@@ -196,6 +224,8 @@ function frame(time: number): void {
   hover.update(views.camera3d, s.view === '3d' && s.started);
   hud.update(s, bolus.active, views.fluoro.hasImage);
   panel.update(devices);
+  checklist.update();
+  mentor.update(ctx);
   toolbar.update(devices.activeTool, devices, pressed);
   requestAnimationFrame(frame);
 }
@@ -204,4 +234,4 @@ requestAnimationFrame(frame);
 showStartScreen(document.body).then(() => store.set({ started: true }));
 
 // Handy for debugging in the browser console.
-Object.assign(window, { __sim: { store, anatomy, views, bolus, devices } });
+Object.assign(window, { __sim: { store, anatomy, views, bolus, devices, procedure, log } });

@@ -26,7 +26,7 @@ npm run build    # typecheck + production build
 | Tab | Toggle 3D view / fluoroscopy |
 | V, arrow keys | C-arm projection presets / fine angle |
 | F | Camera follows the device tip |
-| L / H | Anatomy labels / key help |
+| L / H / M | Anatomy labels / key help / collapse mentor |
 | Mouse drag, Ctrl+wheel | Orbit / zoom (3D view) |
 
 ## Layout
@@ -36,8 +36,9 @@ src/config/anatomy.ts   all anatomy sizes, positions, lesion, fluoro & contrast 
 src/anatomy/            procedural heart, vessel tree, lumen profiles, fluoro skeleton
 src/physics/            device rail model (route), guide catheter, guidewire, contrast transit
 src/tools/              tool definitions & rules, device controller, hover picking
+src/procedure/          stage definitions, progression logic, per-frame procedure snapshot
 src/scene/              renderer, cameras, C-arm, fluoroscopy materials + post-processing
-src/ui/                 start screen, HUD
+src/ui/                 start screen, HUD, toolbar, device panel, checklist, mentor
 src/state/              in-memory store
 tests/                  unit tests
 ```
