@@ -147,6 +147,7 @@ export const VESSELS: VesselSpec[] = [
       'Right radial access: the catheter enters at the wrist and travels up the radial, brachial, axillary and subclavian arteries, then the brachiocephalic trunk into the aortic arch.',
     onHeart: false,
     system: 'none',
+    // `at` is recomputed from geometry (nearest aortic point to this vessel's end).
     joins: { vessel: 'aorta', at: 0.34, end: 'end' },
     points: [
       [-235, -75, 38], // right radial artery at the wrist (puncture site)
@@ -342,4 +343,52 @@ export const SKELETON = {
   spine: { x: 0, z: -75, yFrom: -170, yTo: 170, bodyRadius: 18, bodyHeight: 22, gap: 5 },
   ribs: { count: 9, topY: 150, spacing: 32, radiusX: 140, radiusZ: 95, centerZ: -20, drop: 45, tube: 5 },
   diaphragm: { center: [10, -160, -10] as Vec3, radii: [185, 95, 140] as Vec3 },
+};
+
+// ---------------------------------------------------------------------------
+// Devices
+// ---------------------------------------------------------------------------
+
+export const DEVICES = {
+  guide: {
+    /** 6 French guide catheter: 6F = 2 mm outer diameter. */
+    radius: 1.0,
+    /** How far above the aortic root centre the guide can travel without engaging (fraction of aorta). */
+    rootStopU: 0.03,
+    /** Length of the pre-shaped curve at the tip (a Judkins/EBU-like hook), mm. */
+    hookLength: 22,
+    /** How far the hook swings the tip sideways, mm. */
+    hookSize: 11,
+    /** Engagement works when the tip points within this many degrees of the left coronary cusp. */
+    engageToleranceDeg: 25,
+    /** How far the guide seats into the left main once engaged, mm. */
+    seatDepthMm: 4,
+    /** Rotation error (deg) at which an engaged guide pops back out of the ostium. */
+    disengageDeg: 40,
+    /** Rotation angle when the tip first reaches the aortic root (deg; 0 = facing the left cusp). */
+    initialRotationDeg: 250,
+    speedMmPerS: 70,
+    fineSpeedMmPerS: 15,
+    rotateDegPerS: 90,
+  },
+  wire: {
+    /** 0.014" coronary guidewire = 0.36 mm diameter (drawn slightly thicker so it stays visible). */
+    radius: 0.18,
+    visualRadius: 0.3,
+    /** Radiopaque distal segment, mm. */
+    tipOpaqueMm: 30,
+    /** Small shaped bend at the tip used for steering, mm. */
+    tipBendMm: 3,
+    speedMmPerS: 25,
+    fineSpeedMmPerS: 6,
+    rotateDegPerS: 120,
+    /** The wire enters a side branch when the tip points within this angle of it (deg). */
+    branchCaptureDeg: 50,
+    /** Safe advancing speed through the lesion (mm/s); faster = "forcing". */
+    lesionSafeSpeed: 8,
+    /** Hidden dissection risk added per mm/s of excess speed per second. */
+    riskPerExcess: 0.004,
+  },
+  /** Contrast volume per injection (ml). */
+  contrastMl: { selective: 8, aortic: 20 },
 };

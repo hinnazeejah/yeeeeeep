@@ -22,6 +22,13 @@ export class Hud {
   private readonly carmEl: HTMLElement;
   private readonly modeEl: HTMLElement;
   private readonly msgEl: HTMLElement;
+  private readonly flEl: HTMLElement;
+  private readonly ctEl: HTMLElement;
+  private readonly help: HTMLElement;
+
+  toggleHelp(): void {
+    this.help.classList.toggle('show');
+  }
 
   constructor(root: HTMLElement) {
     const top = document.createElement('div');
@@ -30,17 +37,38 @@ export class Hud {
     top.innerHTML = `
       <span class="title">PCI SIM</span>
       <span class="tag" data-view>3D</span>
-      <span class="tag" data-xray>X-RAY OFF</span>`;
+      <span class="tag" data-xray>X-RAY OFF</span>
+      <span class="stat">FLUORO <b class="mono" data-fl>00:00</b></span>
+      <span class="stat">CONTRAST <b class="mono" data-ct>0</b> ml</span>`;
     root.appendChild(top);
     this.viewTag = top.querySelector('[data-view]')!;
     this.xrayTag = top.querySelector('[data-xray]')!;
+    this.flEl = top.querySelector('[data-fl]')!;
+    this.ctEl = top.querySelector('[data-ct]')!;
 
-    const hints = document.createElement('div');
-    hints.id = 'hud-hints';
-    hints.className = 'panel';
-    hints.innerHTML =
-      '<b>Tab</b> view · <b>Space</b> fluoro · <b>C</b> cine · <b>V</b> C-arm preset · <b>←↑↓→</b> angle · <b>L</b> labels · drag to orbit (3D)';
-    root.appendChild(hints);
+    const helpBtn = document.createElement('button');
+    helpBtn.className = 'tag help-btn';
+    helpBtn.textContent = 'H · KEYS';
+    top.appendChild(helpBtn);
+    this.help = document.createElement('div');
+    this.help.id = 'hud-help';
+    this.help.className = 'panel';
+    this.help.innerHTML = `
+      <table>
+        <tr><td>1–7</td><td>Select tool (hover a tool for its rules)</td></tr>
+        <tr><td>W / S · wheel</td><td>Advance / retract the device</td></tr>
+        <tr><td>A / D</td><td>Rotate (torque) the device</td></tr>
+        <tr><td>Shift</td><td>Fine control</td></tr>
+        <tr><td>Space · 6</td><td>Fluoro pedal (hold)</td></tr>
+        <tr><td>5 · C</td><td>Contrast injection (cine)</td></tr>
+        <tr><td>Tab</td><td>3D view / fluoroscopy</td></tr>
+        <tr><td>V · arrows</td><td>C-arm projection / angle</td></tr>
+        <tr><td>F</td><td>Camera follows device tip</td></tr>
+        <tr><td>L</td><td>Anatomy labels</td></tr>
+        <tr><td>Drag · Ctrl+wheel</td><td>Orbit / zoom (3D)</td></tr>
+      </table>`;
+    root.appendChild(this.help);
+    helpBtn.addEventListener('click', () => this.toggleHelp());
 
     this.overlay = document.createElement('div');
     this.overlay.id = 'fluoro-overlay';
@@ -67,5 +95,7 @@ export class Hud {
     this.carmEl.textContent = formatCArm(s.carm);
     this.modeEl.textContent = cine ? 'CINE' : s.xrayOn ? 'FLUORO' : 'LIH';
     this.msgEl.style.display = hasImage ? 'none' : '';
+    this.flEl.textContent = formatTime(s.fluoroSeconds);
+    this.ctEl.textContent = String(s.contrastMl);
   }
 }

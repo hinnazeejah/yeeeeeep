@@ -11,9 +11,10 @@ export function showStartScreen(root: HTMLElement): Promise<void> {
         It is not clinical training, is not validated against real patients, and is not medical advice.
       </div>
       <ul>
-        <li><b>Tab</b> switches between the 3D view and live fluoroscopy</li>
-        <li>Hold <b>Space</b> for fluoroscopy, press <b>C</b> for a contrast injection (cine)</li>
-        <li><b>V</b> cycles the C-arm projections, arrow keys fine-tune the angle</li>
+        <li>Tools on the bottom bar, keys <b>1–7</b>. Hover a tool to read its rules.</li>
+        <li><b>W/S</b> or the mouse wheel push and pull the device, <b>A/D</b> rotate it, hold <b>Shift</b> for fine control</li>
+        <li><b>Tab</b> switches between the 3D view and live fluoroscopy. Hold <b>Space</b> (or 6) for X-ray, press <b>5</b> to inject contrast</li>
+        <li><b>V</b> cycles the C-arm projections, arrow keys fine-tune the angle. <b>F</b> toggles camera follow</li>
       </ul>
       <button class="primary" id="start-btn">ENTER THE CATH LAB</button>
     </div>`;

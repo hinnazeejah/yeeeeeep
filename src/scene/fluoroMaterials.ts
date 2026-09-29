@@ -108,3 +108,39 @@ export function createVesselFluoroMaterial(gain = 1): ShaderMaterial {
     }),
   );
 }
+
+/**
+ * Devices on X-ray. Each vertex carries its own attenuation (aMu) so one tube can have a
+ * faint shaft and a strongly radiopaque tip (guidewires) or marker bands (balloons, stents).
+ */
+export function createDeviceFluoroMaterial(radius: number): ShaderMaterial {
+  return multiplyBlend(
+    new ShaderMaterial({
+      uniforms: { uRadius: { value: radius } },
+      vertexShader: /* glsl */ `
+        attribute float aMu;
+        varying vec3 vN;
+        varying vec3 vV;
+        varying float vMu;
+        void main() {
+          vMu = aMu;
+          vec4 mv = modelViewMatrix * vec4(position, 1.0);
+          vN = normalize(normalMatrix * normal);
+          vV = normalize(-mv.xyz);
+          gl_Position = projectionMatrix * mv;
+        }
+      `,
+      fragmentShader: /* glsl */ `
+        uniform float uRadius;
+        varying vec3 vN;
+        varying vec3 vV;
+        varying float vMu;
+        void main() {
+          float facing = abs(dot(normalize(vN), normalize(vV)));
+          float chord = 2.0 * uRadius * mix(0.35, 1.0, facing);
+          gl_FragColor = vec4(vec3(exp(-vMu * chord)), 1.0);
+        }
+      `,
+    }),
+  );
+}

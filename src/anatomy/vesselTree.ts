@@ -11,7 +11,11 @@ const SURFACE_LIFT = 0.8;
 /** Build every vessel from the config. Parents are built before their branches. */
 export function buildVesselTree(): VesselTree {
   const tree: VesselTree = new Map();
-  for (const spec of VESSELS) tree.set(spec.id, buildVessel(spec, tree));
+  for (const spec of VESSELS) {
+    const v = buildVessel(spec, tree);
+    if (spec.joins?.end === 'end') spec.joins.at = nearestU(tree.get(spec.joins.vessel)!, v.pointAt(1));
+    tree.set(spec.id, v);
+  }
 
   // Add the target lesion.
   const lad = tree.get(LESION.vessel)!;
@@ -23,6 +27,12 @@ export function buildVesselTree(): VesselTree {
   lad.updateGeometry();
 
   computeTreeDistances(tree);
+  for (const v of tree.values()) {
+    const j = v.spec.joins;
+    if (j && j.end === 'start' && v.spec.onHeart && tree.get(j.vessel)!.spec.onHeart) {
+      tree.get(j.vessel)!.children.push(v);
+    }
+  }
   return tree;
 }
 
@@ -55,6 +65,21 @@ function buildVessel(spec: VesselSpec, tree: VesselTree): Vessel {
     curve = new CatmullRomCurve3(dense, false, 'centripetal');
   }
   return new Vessel(spec, curve, knots);
+}
+
+/** Position along `v` (u) closest to point `p` (same space). */
+function nearestU(v: Vessel, p: Vector3): number {
+  let best = 0;
+  let bestD = Infinity;
+  const q = new Vector3();
+  for (let i = 0; i <= 1000; i++) {
+    const d = v.pointAt(i / 1000, q).distanceToSquared(p);
+    if (d < bestD) {
+      bestD = d;
+      best = i / 1000;
+    }
+  }
+  return best;
 }
 
 /** Map config radii to arc-length positions along the curve. */

@@ -17,6 +17,12 @@ export interface SimState {
   labelsVisible: boolean;
   /** X-rays currently on (fluoro pedal or cine). */
   xrayOn: boolean;
+  /** Total fluoroscopy + cine time (s). */
+  fluoroSeconds: number;
+  /** Total contrast used (ml). */
+  contrastMl: number;
+  /** 3D camera follows the active device tip. */
+  follow: boolean;
 }
 
 type Listener = (s: SimState) => void;
@@ -32,6 +38,9 @@ class Store {
     carmPreset: 0,
     labelsVisible: true,
     xrayOn: false,
+    fluoroSeconds: 0,
+    contrastMl: 0,
+    follow: true,
   };
   private listeners = new Set<Listener>();
 

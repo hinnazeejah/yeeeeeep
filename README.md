@@ -18,20 +18,24 @@ npm run build    # typecheck + production build
 
 | Key | Action |
 | --- | --- |
+| 1 / 2 | Select guide catheter / guidewire (hover toolbar buttons for rules) |
+| W / S, mouse wheel | Advance / retract the active device (Shift = fine) |
+| A / D | Rotate (torque) the active device |
+| 5 or C | Contrast injection (cine): selective if the guide is engaged, aortic flush otherwise |
+| 6 or Space (hold) | Fluoro pedal: live X-ray; release = last image hold |
 | Tab | Toggle 3D view / fluoroscopy |
-| Space (hold) | Fluoro pedal: live X-ray; release = last image hold |
-| C | Contrast injection (cine) into the left coronary system |
-| V | Cycle standard C-arm projections |
-| Arrow keys | Fine-tune C-arm angle (LAO/RAO, cranial/caudal) |
-| L | Toggle anatomy labels (3D) |
-| Mouse | Orbit / zoom (3D view) |
+| V, arrow keys | C-arm projection presets / fine angle |
+| F | Camera follows the device tip |
+| L / H | Anatomy labels / key help |
+| Mouse drag, Ctrl+wheel | Orbit / zoom (3D view) |
 
 ## Layout
 
 ```
 src/config/anatomy.ts   all anatomy sizes, positions, lesion, fluoro & contrast constants
 src/anatomy/            procedural heart, vessel tree, lumen profiles, fluoro skeleton
-src/physics/            contrast transit / flow model
+src/physics/            device rail model (route), guide catheter, guidewire, contrast transit
+src/tools/              tool definitions & rules, device controller, hover picking
 src/scene/              renderer, cameras, C-arm, fluoroscopy materials + post-processing
 src/ui/                 start screen, HUD
 src/state/              in-memory store

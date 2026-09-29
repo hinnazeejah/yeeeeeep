@@ -11,12 +11,13 @@ import {
   type ShaderMaterial,
 } from 'three';
 import { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
-import { CONTRAST, FLUORO, HEART, LABELS, LESION, type CoronarySystem, type VesselId } from '../config/anatomy';
+import { CONTRAST, FLUORO, HEART, LABELS, LESION, type VesselId } from '../config/anatomy';
 import { createBodyMaterial, createVesselFluoroMaterial } from '../scene/fluoroMaterials';
 import { buildHeartGeometry } from './heart';
 import { contraction, HEART_POSITION, HEART_QUATERNION } from './heartShape';
 import { buildFluoroSkeleton } from './skeleton';
 import { buildVesselTree, type VesselTree } from './vesselTree';
+import type { Vessel } from './vessel';
 import { computeTransitTimes, type ContrastBolus } from '../physics/flow';
 
 /** A heart "rig": `frame` holds the resting pose, `pulse` scales with each heartbeat. */
@@ -46,8 +47,12 @@ export class AnatomyModel {
   readonly rigFluoro = createRig();
   readonly labels = new Group();
   private readonly fluoroVesselMats = new Map<VesselId, ShaderMaterial>();
-  /** Which coronary system the current injection fills. */
-  injectedSystem: CoronarySystem = 'left';
+  private readonly vesselMats3d = new Map<VesselId, MeshStandardMaterial>();
+  private highlighted: VesselId | null = null;
+  /** 3D vessel meshes, for hover picking. */
+  readonly pickables: Mesh[] = [];
+  /** What the current injection fills: selective left coronary, or a non-selective aortic flush. */
+  injectedSystem: 'left' | 'aortic' = 'left';
   private labelsVisible = true;
 
   constructor(scene3d: Scene, sceneFluoro: Scene) {
@@ -66,6 +71,7 @@ export class AnatomyModel {
     );
     heart3d.name = 'heart';
     this.rig3d.pulse.add(heart3d);
+    this.pickables.push(heart3d); // occludes vessels behind the heart when picking
     const heartSize = HEART.radii[0] + HEART.radii[2];
     this.rigFluoro.pulse.add(new Mesh(heartGeo, createBodyMaterial(FLUORO.mu.softTissue * 2.0, heartSize)));
 
@@ -84,6 +90,9 @@ export class AnatomyModel {
       });
       const m3d = new Mesh(v.geometry, mat3d);
       m3d.name = v.spec.id;
+      m3d.userData.vessel = v.spec.id;
+      this.vesselMats3d.set(v.spec.id, mat3d);
+      this.pickables.push(m3d);
       m3d.renderOrder = coronary ? 1 : 2;
       const fmat = createVesselFluoroMaterial(v.spec.id === 'access' ? 0 : 1);
       this.fluoroVesselMats.set(v.spec.id, fmat);
@@ -136,6 +145,28 @@ export class AnatomyModel {
     const l = 1 - HEART.pulse.longitudinal * c;
     this.rig3d.pulse.scale.set(r, l, r);
     this.rigFluoro.pulse.scale.set(r, l, r);
+    this.rig3d.frame.updateMatrixWorld(true);
+  }
+
+  /** Vessel-space point → world, including the current heartbeat for coronaries. */
+  readonly toWorld = (vessel: Vessel, local: Vector3, out: Vector3): Vector3 => {
+    out.copy(local);
+    return vessel.spec.onHeart ? out.applyMatrix4(this.rig3d.pulse.matrixWorld) : out;
+  };
+
+  /** Make coronaries see-through while a wire is inside them. */
+  setCoronaryOpacity(opacity: number): void {
+    for (const [id, m] of this.vesselMats3d) {
+      if (this.vessels.get(id)!.spec.onHeart) m.opacity = opacity;
+    }
+  }
+
+  /** Hover highlight for one vessel (null clears it). */
+  setHighlight(id: VesselId | null): void {
+    if (id === this.highlighted) return;
+    if (this.highlighted) this.vesselMats3d.get(this.highlighted)!.emissiveIntensity = 1;
+    this.highlighted = id;
+    if (id) this.vesselMats3d.get(id)!.emissiveIntensity = 4;
   }
 
   /** Feed the current contrast bolus into the fluoro vessel shaders. */
@@ -146,11 +177,20 @@ export class AnatomyModel {
       u.uFront.value = bolus.front;
       u.uTail.value = bolus.tail;
       let gain = 0;
-      if (v.spec.system === this.injectedSystem) gain = 1;
-      if (id === 'aorta') {
-        // Some dye refluxes back into the aortic root during a selective injection.
-        gain = CONTRAST.aorticReflux;
-        u.uMaxT.value = 0.35;
+      if (this.injectedSystem === 'left') {
+        if (v.spec.system === 'left') gain = 1;
+        if (id === 'aorta') {
+          // Some dye refluxes back into the aortic root during a selective injection.
+          gain = CONTRAST.aorticReflux;
+          u.uMaxT.value = 0.35;
+        }
+      } else {
+        // Aortic flush: the root is dense, both coronaries fill faintly.
+        if (v.spec.system !== 'none') gain = 0.3;
+        if (id === 'aorta') {
+          gain = 0.2;
+          u.uMaxT.value = 0.9;
+        }
       }
       u.uGain.value = gain;
       u.uDensity.value = bolus.density;

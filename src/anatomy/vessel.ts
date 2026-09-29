@@ -26,6 +26,8 @@ export class Vessel {
   readonly transit: Float32Array;
 
   readonly stenoses: Stenosis[] = [];
+  /** Coronary branches that leave this vessel (filled in by the tree builder). */
+  readonly children: Vessel[] = [];
   private readonly knots: { u: number; r: number }[];
   private readonly frames: { tangents: Vector3[]; normals: Vector3[]; binormals: Vector3[] };
   private readonly centers: Vector3[] = [];
@@ -60,6 +62,12 @@ export class Vessel {
 
   pointAt(u: number, out = new Vector3()): Vector3 {
     return out.copy(this.curve.getPointAt(Math.min(1, Math.max(0, u))));
+  }
+
+  /** Local tangent / normal / binormal at u (nearest ring). Used to measure branch and tip angles. */
+  frameAt(u: number): { t: Vector3; n: Vector3; b: Vector3 } {
+    const i = Math.round(Math.min(1, Math.max(0, u)) * this.segments);
+    return { t: this.frames.tangents[i], n: this.frames.normals[i], b: this.frames.binormals[i] };
   }
 
   private createGeometry(): BufferGeometry {
