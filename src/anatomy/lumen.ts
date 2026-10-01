@@ -49,3 +49,32 @@ export function diameterStenosis(minDiameter: number, referenceDiameter: number)
   if (referenceDiameter <= 0) return 0;
   return Math.min(1, Math.max(0, 1 - minDiameter / referenceDiameter));
 }
+
+/**
+ * A segment where a device holds the lumen open (inflated balloon, balloon result, stent).
+ * The lumen radius there is at least `radius`, with short tapers at both ends.
+ */
+export interface Expansion {
+  startMm: number;
+  endMm: number;
+  radius: number;
+}
+
+/** 0..1 weight of an expansion at `mm`: 1 inside, smooth falloff over `edgeMm` outside the ends. */
+export function expansionWeight(mm: number, e: Expansion, edgeMm = 1.2): number {
+  if (mm >= e.startMm && mm <= e.endMm) return 1;
+  const d = mm < e.startMm ? e.startMm - mm : mm - e.endMm;
+  if (d >= edgeMm) return 0;
+  const t = d / edgeMm;
+  return 0.5 * (1 + Math.cos(Math.PI * t));
+}
+
+/** Apply expansions to a diseased radius: each one pushes the lumen out to its radius. */
+export function expandedRadius(mm: number, diseased: number, expansions: Expansion[]): number {
+  let r = diseased;
+  for (const e of expansions) {
+    const w = expansionWeight(mm, e);
+    if (w > 0) r = Math.max(r, diseased + (e.radius - diseased) * w);
+  }
+  return r;
+}

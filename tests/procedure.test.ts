@@ -7,11 +7,21 @@ function ctx(patch: Partial<ProcedureContext> = {}): ProcedureContext {
   return {
     guide: { zone: 'sheath', pastElbow: false, facing: 'none', engaged: false },
     wire: { out: false, vessel: null, inLesion: false, crossed: false, distal: false, upcoming: null },
+    heparin: false,
     fluoroInAorta: false,
     selectiveAngios: 0,
     activeTool: 'guide',
-    balloon: { positioned: false, inflatedOverLesion: false, deflatedAfterInflation: false },
-    stent: { sized: false, positioned: false, deployed: false },
+    balloon: { out: false, positioned: false, margin: null, pressure: 0, inflatedOverLesion: false, deflatedAfterInflation: false },
+    stent: {
+      out: false,
+      measured: false,
+      sized: false,
+      positioned: false,
+      proximalMargin: null,
+      distalMargin: null,
+      pressure: 0,
+      deployed: false,
+    },
     angiosAfterStent: 0,
     projectionsAfterStent: 0,
     ...patch,
@@ -69,16 +79,45 @@ describe('Procedure stages', () => {
     const p = new Procedure();
     p.update(atRoot, 1);
     p.update({ ...engaged, selectiveAngios: 1 }, 2);
-    const wire = (w: Partial<ProcedureContext['wire']>) => ({
+    const wire = (w: Partial<ProcedureContext['wire']>, heparin = true) => ({
       ...engaged,
+      heparin,
       selectiveAngios: 1,
       wire: { out: true, vessel: 'lad' as const, inLesion: false, crossed: false, distal: false, upcoming: null, ...w },
     });
-    p.update(wire({ crossed: true }), 3);
-    expect(p.current).toBe(2);
-    p.update(wire({ crossed: true, distal: true }), 4);
+    p.update(wire({ crossed: true }, false), 3);
+    expect(p.isDone(2, 'heparin')).toBe(false);
+    p.update(wire({ crossed: true }), 4);
+    expect(p.current).toBe(2); // not yet parked distally
+    p.update(wire({ crossed: true, distal: true }), 5);
     expect(p.current).toBe(3);
-    expect(p.progress).toBeCloseTo(11 / STAGES.reduce((n, s) => n + s.subtasks.length, 0));
+    expect(p.progress).toBeCloseTo(12 / STAGES.reduce((n, s) => n + s.subtasks.length, 0));
+  });
+
+  it('runs through pre-dilation, stenting and the final angiogram', () => {
+    const p = new Procedure();
+    p.update(atRoot, 1);
+    const base = { ...engaged, heparin: true, selectiveAngios: 1 };
+    const wired = { ...base, wire: { out: true, vessel: 'lad' as const, inLesion: false, crossed: true, distal: true, upcoming: null } };
+    p.update(base, 2);
+    p.update(wired, 3);
+    expect(p.current).toBe(3);
+    const b = (patch: Partial<ProcedureContext['balloon']>) => ({ ...wired, balloon: { ...wired.balloon, ...patch } });
+    p.update(b({ out: true, positioned: true }), 4);
+    p.update(b({ out: true, positioned: true, inflatedOverLesion: true, pressure: 10 }), 5);
+    expect(p.current).toBe(3);
+    p.update(b({ out: true, positioned: true, inflatedOverLesion: true, deflatedAfterInflation: true }), 6);
+    expect(p.current).toBe(4);
+    const st = (patch: Partial<ProcedureContext['stent']>) => ({ ...wired, stent: { ...wired.stent, ...patch } });
+    p.update(st({ out: true, positioned: true }), 7);
+    expect(p.isDone(4, 'ssize')).toBe(false); // not measured
+    p.update(st({ out: true, measured: true, sized: true, positioned: true }), 8);
+    p.update(st({ measured: true, sized: true, positioned: true, deployed: true }), 9);
+    expect(p.current).toBe(5);
+    p.update({ ...wired, angiosAfterStent: 1, projectionsAfterStent: 1 }, 10);
+    expect(p.current).toBe(5);
+    p.update({ ...wired, angiosAfterStent: 2, projectionsAfterStent: 2 }, 11);
+    expect(p.finished).toBe(true);
   });
 
   it('gives a calm hint for every stage without throwing', () => {
@@ -88,8 +127,19 @@ describe('Procedure stages', () => {
 
 describe('tool unlocking', () => {
   const guide = { engaged: true, inAorta: true } as never;
-  it('keeps the wire locked until the angiogram stage is done', () => {
-    expect(toolAvailability('wire', { guide, wire: {} as never, stageIndex: 1 }).ok).toBe(false);
-    expect(toolAvailability('wire', { guide, wire: {} as never, stageIndex: 2 }).ok).toBe(true);
+  const wire = {} as never;
+  it('keeps the wire locked until the angiogram stage is done and heparin is given', () => {
+    expect(toolAvailability('wire', { guide, wire, stageIndex: 1, heparin: true }).ok).toBe(false);
+    expect(toolAvailability('wire', { guide, wire, stageIndex: 2, heparin: false }).ok).toBe(false);
+    expect(toolAvailability('wire', { guide, wire, stageIndex: 2, heparin: true }).ok).toBe(true);
+  });
+
+  it('unlocks balloon then stent in order, one catheter at a time', () => {
+    expect(toolAvailability('balloon', { guide, wire, stageIndex: 2 }).ok).toBe(false);
+    expect(toolAvailability('balloon', { guide, wire, stageIndex: 3 }).ok).toBe(true);
+    expect(toolAvailability('stent', { guide, wire, stageIndex: 3 }).ok).toBe(false);
+    expect(toolAvailability('stent', { guide, wire, stageIndex: 4, balloon: { out: true } }).ok).toBe(false);
+    expect(toolAvailability('stent', { guide, wire, stageIndex: 4, balloon: { out: false } }).ok).toBe(true);
+    expect(toolAvailability('balloon', { guide, wire, stageIndex: 4, stentSys: { out: true } }).ok).toBe(false);
   });
 });

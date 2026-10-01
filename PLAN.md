@@ -53,12 +53,12 @@ tests/                    evaluation + flow unit tests (Vitest)
 ## Controls
 Tab toggle view · 1–7 tools · wheel / W,S advance-retract · A,D rotate · hold Space or 6 = fluoro · click-and-hold dial for pressure · mouse orbit in 3D · Esc pause · D-mode button for demo.
 
-## Milestones (each runnable with `npm run dev`)
+## Milestones (each runnable with `npm run dev`) — all complete
 - **M1** Project scaffold, config file, heart + coronaries + aorta + access path, orbit camera, fluoro view + Tab toggle.
 - **M2** Toolbar (1–7, cursors, hover), device rail model, guide catheter + guidewire movement and branch steering.
 - **M3** Stage system, checklist, mentor panel (collapsible, sub-tasks, %).
-- **M4** Balloon, stent (strut expansion), contrast fill/washout, vitals + ECG with ST changes, audio.
-- **M5** Complications, debrief, demo mode with take-over, start screen/disclaimer, polish. Unit tests land in M4 alongside evaluation code and grow in M5.
+- **M4** Balloon, stent (strut expansion), contrast fill/washout, vitals + ECG with ST changes, audio. Also: heparin/ACT gate before wiring, QCA measure tool.
+- **M5** Complications, debrief, demo mode with take-over, start screen/disclaimer, polish. Also: case vignette, "Why this step?" teaching notes, pause. Unit tests land in M4 alongside evaluation code and grow in M5.
 
 After each milestone: `npm run build` + `npm test` + dev server smoke run, fixes, and a short "what to test" list.
 

@@ -217,6 +217,23 @@ export class AnatomyModel {
     });
   }
 
+  /** Lumen diameter (mm) of a vessel at the point nearest a world-space position (for hover QCA). */
+  diameterAt(id: VesselId, world: Vector3): number {
+    const v = this.vessels.get(id)!;
+    const p = v.spec.onHeart ? this.rig3d.pulse.worldToLocal(world.clone()) : world;
+    const q = new Vector3();
+    let best = 0;
+    let bestD = Infinity;
+    for (let i = 0; i <= v.segments; i++) {
+      const d = v.pointAt(i / v.segments, q).distanceToSquared(p);
+      if (d < bestD) {
+        bestD = d;
+        best = i / v.segments;
+      }
+    }
+    return 2 * v.radiusAt(best);
+  }
+
   setLabelsVisible(visible: boolean): void {
     this.labelsVisible = visible;
     // CSS2DRenderer ignores parent visibility, so toggle each label itself.

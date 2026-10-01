@@ -73,6 +73,7 @@ export class HoverPicker {
         const accept = TARGETS[tool];
         if (accept && accept(id, v.spec.onHeart)) vessel = id;
         text = v.spec.name;
+        if (tool === 'measure' && v.spec.onHeart) text += ` · Ø ${this.anatomy.diameterAt(id, hit.point).toFixed(2)} mm`;
       }
     }
     this.anatomy.setHighlight(vessel);

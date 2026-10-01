@@ -1,6 +1,6 @@
 import { BufferAttribute, BufferGeometry, CatmullRomCurve3, Vector3 } from 'three';
 import type { VesselSpec } from '../config/anatomy';
-import { stenosisFactor, taperRadius, type Stenosis } from './lumen';
+import { expandedRadius, stenosisFactor, taperRadius, type Expansion, type Stenosis } from './lumen';
 
 const MIN_VISUAL_RADIUS = 0.3;
 
@@ -26,6 +26,18 @@ export class Vessel {
   readonly transit: Float32Array;
 
   readonly stenoses: Stenosis[] = [];
+  /**
+   * Treatments that hold the lumen open: balloon results (after recoil) and stents.
+   * `live` is a balloon inflated right now (it stretches the vessel while it is up).
+   */
+  readonly expansions: Expansion[] = [];
+  live: Expansion | null = null;
+  /** An inflated balloon blocks all flow from this point (mm) on. */
+  occludedFromMm: number | null = null;
+  /** A tear in the vessel wall (mm from the vessel start); sealed once a stent covers it. */
+  dissection: { mm: number; sealed: boolean } | null = null;
+  /** Per-ring flow fraction (1 = normal), filled by the flow model. */
+  readonly flow: Float32Array;
   /** Coronary branches that leave this vessel (filled in by the tree builder). */
   readonly children: Vessel[] = [];
   private readonly knots: { u: number; r: number }[];
@@ -44,6 +56,7 @@ export class Vessel {
     this.frames = curve.computeFrenetFrames(this.segments, false);
     for (let i = 0; i <= this.segments; i++) this.centers.push(curve.getPointAt(i / this.segments));
     this.transit = new Float32Array(this.segments + 1);
+    this.flow = new Float32Array(this.segments + 1).fill(1);
     this.geometry = this.createGeometry();
   }
 
@@ -52,12 +65,29 @@ export class Vessel {
     return taperRadius(u, this.knots);
   }
 
-  /** Actual lumen radius at u including stenoses and any later treatment. */
-  radiusAt(u: number): number {
+  /** Lumen radius at u with disease only (no treatment). */
+  diseasedRadiusAt(u: number): number {
     const mm = u * this.length;
     let f = 1;
     for (const s of this.stenoses) f *= stenosisFactor(mm, s);
     return this.referenceRadiusAt(u) * f;
+  }
+
+  /** Actual lumen radius at u including stenoses and any treatment. */
+  radiusAt(u: number): number {
+    const r = this.diseasedRadiusAt(u);
+    if (this.expansions.length === 0 && !this.live) return r;
+    const list = this.live ? [...this.expansions, this.live] : this.expansions;
+    return expandedRadius(u * this.length, r, list);
+  }
+
+  /** Radius at a distance (mm) from the vessel start. */
+  radiusAtMm(mm: number): number {
+    return this.radiusAt(mm / this.length);
+  }
+
+  referenceRadiusAtMm(mm: number): number {
+    return this.referenceRadiusAt(mm / this.length);
   }
 
   pointAt(u: number, out = new Vector3()): Vector3 {

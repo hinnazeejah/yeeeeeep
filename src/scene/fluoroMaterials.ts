@@ -144,3 +144,47 @@ export function createDeviceFluoroMaterial(radius: number): ShaderMaterial {
     }),
   );
 }
+
+/**
+ * Variable-radius devices on X-ray (balloons, stents). Each vertex carries its attenuation (aMu)
+ * and its tube radius (aR). `shell` models a thin metal mesh (a stent): the X-ray path through a
+ * thin wall is longest at the silhouette, so a stent shows as two faint parallel lines.
+ * `uGain` scales everything (used to fade dissection staining in and out).
+ */
+export function createTubeFluoroMaterial(shell = false): ShaderMaterial {
+  return multiplyBlend(
+    new ShaderMaterial({
+      uniforms: { uShell: { value: shell ? 1 : 0 }, uGain: { value: 1 } },
+      vertexShader: /* glsl */ `
+        attribute float aMu;
+        attribute float aR;
+        varying vec3 vN;
+        varying vec3 vV;
+        varying float vMu;
+        varying float vR;
+        void main() {
+          vMu = aMu;
+          vR = aR;
+          vec4 mv = modelViewMatrix * vec4(position, 1.0);
+          vN = normalize(normalMatrix * normal);
+          vV = normalize(-mv.xyz);
+          gl_Position = projectionMatrix * mv;
+        }
+      `,
+      fragmentShader: /* glsl */ `
+        uniform float uShell, uGain;
+        varying vec3 vN;
+        varying vec3 vV;
+        varying float vMu;
+        varying float vR;
+        void main() {
+          float facing = abs(dot(normalize(vN), normalize(vV)));
+          float solid = 2.0 * vR * mix(0.35, 1.0, facing);
+          float wall = 0.12 / max(facing, 0.12);
+          float chord = mix(solid, wall, uShell);
+          gl_FragColor = vec4(vec3(exp(-vMu * uGain * chord)), 1.0);
+        }
+      `,
+    }),
+  );
+}

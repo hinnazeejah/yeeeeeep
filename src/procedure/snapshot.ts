@@ -1,6 +1,16 @@
 import type { DeviceController } from '../tools/deviceController';
 import type { ProcedureContext } from './stages';
 
+export interface InflationRecord {
+  kind: 'balloon' | 'stent';
+  nominal: number;
+  peakAtm: number;
+  peakDiameter: number;
+  seconds: number;
+  /** Fraction of the lesion covered by the balloon's working length. */
+  lesionOverlap: number;
+}
+
 /** Things that happened during the procedure (not derivable from device positions). */
 export class ProcedureLog {
   fluoroInAorta = false;
@@ -9,6 +19,14 @@ export class ProcedureLog {
   angiosAfterStent = 0;
   private readonly projectionsAfterStent = new Set<string>();
   stentDeployed = false;
+  heparinGiven = false;
+  /** QCA used on the lesion after a diagnostic angiogram. */
+  measured = false;
+  predilated = false;
+  predilationBalloon: number | null = null;
+  readonly inflations: InflationRecord[] = [];
+  dissectionCause: string | null = null;
+  balloonRupture = false;
 
   recordFluoro(devices: DeviceController): void {
     if (devices.guide.inAorta) this.fluoroInAorta = true;
@@ -24,6 +42,18 @@ export class ProcedureLog {
       this.angiosAfterStent++;
       this.projectionsAfterStent.add(projection);
     }
+  }
+
+  recordInflation(r: InflationRecord): void {
+    this.inflations.push(r);
+    if (r.kind === 'balloon' && r.lesionOverlap >= 0.5 && r.peakAtm >= 6) {
+      this.predilated = true;
+      this.predilationBalloon = Math.max(this.predilationBalloon ?? 0, r.nominal);
+    }
+  }
+
+  get longestInflation(): number {
+    return this.inflations.reduce((m, r) => Math.max(m, r.seconds), 0);
   }
 
   get projectionCountAfterStent(): number {
@@ -52,6 +82,10 @@ export function buildContext(d: DeviceController, log: ProcedureLog): ProcedureC
 
   const access = d.guide.baseRoute.segs[0].vessel;
   const up = w.upcomingBranch();
+  const b = d.balloon;
+  const s = d.stentSys;
+  const bCov = d.lesionCoverage(b);
+  const sCov = d.lesionCoverage(s);
   return {
     guide: {
       zone,
@@ -68,13 +102,29 @@ export function buildContext(d: DeviceController, log: ProcedureLog): ProcedureC
       distal: w.distal,
       upcoming: up ? { name: up.name, pointing: up.pointing } : null,
     },
+    heparin: log.heparinGiven,
     fluoroInAorta: log.fluoroInAorta,
     selectiveAngios: log.selectiveAngios,
     activeTool: d.activeTool,
-    balloon: { positioned: false, inflatedOverLesion: false, deflatedAfterInflation: false },
-    stent: { sized: false, positioned: false, deployed: log.stentDeployed },
+    balloon: {
+      out: b.out,
+      positioned: b.out && !!bCov && bCov.overlap >= 0.6,
+      margin: bCov ? bCov.distalMargin : null,
+      pressure: b.pressure,
+      inflatedOverLesion: log.predilated,
+      deflatedAfterInflation: log.predilated && !b.inflated,
+    },
+    stent: {
+      out: s.out,
+      sized: log.measured && (s.out || log.stentDeployed),
+      measured: log.measured,
+      positioned: log.stentDeployed || (s.out && !!sCov && sCov.covers),
+      proximalMargin: sCov ? sCov.proximalMargin : null,
+      distalMargin: sCov ? sCov.distalMargin : null,
+      pressure: s.pressure,
+      deployed: log.stentDeployed && !s.inflated,
+    },
     angiosAfterStent: log.angiosAfterStent,
     projectionsAfterStent: log.projectionCountAfterStent,
   };
 }
-

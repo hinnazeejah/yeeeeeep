@@ -22,13 +22,31 @@ export interface ProcedureContext {
     /** Next branch hint from the wire model, if any. */
     upcoming: { name: string; pointing: boolean } | null;
   };
+  /** Heparin given (anticoagulation for coronary instrumentation). */
+  heparin: boolean;
   /** Fluoro used while the guide was in the aorta. */
   fluoroInAorta: boolean;
   selectiveAngios: number;
   activeTool: string;
-  // Filled in by later milestones (balloon, stent, final angiography).
-  balloon: { positioned: boolean; inflatedOverLesion: boolean; deflatedAfterInflation: boolean };
-  stent: { sized: boolean; positioned: boolean; deployed: boolean };
+  balloon: {
+    out: boolean;
+    positioned: boolean;
+    /** Distal marker beyond the distal lesion edge (mm); negative = not far enough. */
+    margin: number | null;
+    pressure: number;
+    inflatedOverLesion: boolean;
+    deflatedAfterInflation: boolean;
+  };
+  stent: {
+    out: boolean;
+    measured: boolean;
+    sized: boolean;
+    positioned: boolean;
+    proximalMargin: number | null;
+    distalMargin: number | null;
+    pressure: number;
+    deployed: boolean;
+  };
   angiosAfterStent: number;
   projectionsAfterStent: number;
 }
@@ -47,6 +65,8 @@ export interface StageDef {
   subtasks: SubTask[];
   /** Short, situation-specific guidance for the mentor panel. */
   hint: (c: ProcedureContext) => string;
+  /** Why this step matters (shown under "Why?" in the mentor). */
+  teach: string;
 }
 
 export const STAGES: StageDef[] = [
@@ -75,6 +95,8 @@ export const STAGES: StageDef[] = [
           return c.fluoroInAorta ? 'The tip is at the root.' : 'The tip is at the root. Take a look on fluoro (Space).';
       }
     },
+    teach:
+      'Radial access (the wrist) causes fewer bleeding complications than femoral access and lets the patient sit up straight away. The guide catheter is the highway every other device travels through, so its position matters for the whole case.',
   },
   {
     id: 'engage',
@@ -97,18 +119,22 @@ export const STAGES: StageDef[] = [
       if (c.guide.facing === 'right') return 'That is the right coronary cusp. Keep rotating towards the left cusp.';
       return 'Rotate slowly with A/D. The green mark on the dial is the left cusp; watch the tip swing on fluoro.';
     },
+    teach:
+      'The left main arises from the left coronary sinus of the aortic root. A coaxial (well aligned) guide gives support for pushing devices and safe contrast injections. The diagnostic angiogram shows where the lesion is and how tight it is before anything enters the artery.',
   },
   {
     id: 'wire',
     title: 'Cross the LAD lesion with the guidewire',
     goal: 'Steer the 0.014" wire into the LAD, cross the tight lesion gently and park the tip in the distal LAD.',
     subtasks: [
+      { id: 'heparin', label: 'Give heparin before wiring (G)', check: (c) => c.heparin },
       { id: 'lm', label: 'Advance the wire out of the guide', check: (c) => c.wire.out },
       { id: 'lad', label: 'Steer into the LAD (not the circumflex)', check: (c) => c.wire.vessel === 'lad' },
       { id: 'cross', label: 'Cross the lesion gently', check: (c) => c.wire.crossed },
       { id: 'distal', label: 'Park the tip in the distal LAD', check: (c) => c.wire.distal },
     ],
     hint: (c) => {
+      if (!c.heparin) return 'Before any wire enters the coronary, anticoagulate: press G (or the Heparin button) to give 70–100 U/kg of heparin.';
       if (c.activeTool !== 'wire') return 'Switch to the guidewire (2).';
       const w = c.wire;
       if (!w.out) return 'Advance the wire out of the guide into the left main.';
@@ -128,37 +154,78 @@ export const STAGES: StageDef[] = [
       if (w.distal) return 'Wire position is stable in the distal LAD.';
       return 'Advance steadily down the LAD towards the lesion.';
     },
+    teach:
+      'Heparin comes first: a wire in a coronary artery is a surface for clot to form on (target ACT 250–300 s). The soft 0.014" wire is steered with small twists of its bent tip. Parking it far down the LAD gives a stable rail for the balloon and stent.',
   },
   {
     id: 'predilate',
     title: 'Pre-dilate with the balloon',
-    goal: 'Prepare the lesion so the stent can expand fully.',
+    goal: 'Prepare the lesion with a balloon slightly smaller than the vessel so the stent can expand fully.',
     subtasks: [
-      { id: 'bpos', label: 'Position the balloon across the lesion', check: (c) => c.balloon.positioned },
-      { id: 'binf', label: 'Inflate over the lesion', check: (c) => c.balloon.inflatedOverLesion },
+      { id: 'bpos', label: 'Position the balloon markers across the lesion', check: (c) => c.balloon.positioned },
+      { id: 'binf', label: 'Inflate over the lesion (6 atm or more)', check: (c) => c.balloon.inflatedOverLesion },
       { id: 'bdef', label: 'Deflate and check the result', check: (c) => c.balloon.deflatedAfterInflation },
     ],
-    hint: () => 'Balloon tools arrive in milestone 4.',
+    hint: (c) => {
+      const b = c.balloon;
+      if (b.inflatedOverLesion) {
+        return b.pressure > 0.3 ? 'Deflate now (Q). Watch the ST segments return to baseline.' : 'Deflated.';
+      }
+      if (c.activeTool !== 'balloon') return 'Select the balloon (3). For a vessel of about 3 mm, a 2.0–2.5 mm balloon is a sensible pre-dilation size.';
+      if (!b.out) return 'Choose a balloon size in the panel, then advance it over the wire (W).';
+      if (b.pressure > 0.3) return 'Inflating: take it to about 8–12 atm (hold E), watch the gauge and the ECG, then deflate (Q) after 10–20 s.';
+      if (!b.positioned) {
+        if (b.margin !== null && b.margin < 0) return 'Keep advancing. The two radiopaque markers should straddle the lesion.';
+        return 'Too far: pull back (S) until the markers straddle the lesion.';
+      }
+      return 'The markers straddle the lesion. Hold E to inflate; Shift gives fine pressure control.';
+    },
+    teach:
+      'A 90% lesion is too tight for a stent to expand evenly. Pre-dilating with a balloon at about 0.8–1.0 times the vessel diameter cracks the plaque and makes room. While the balloon is up it blocks the LAD completely: chest pain and ST elevation in the anterior leads are expected and should settle after deflation.',
   },
   {
     id: 'stent',
     title: 'Deploy the stent',
-    goal: 'Size the stent to the vessel, cover the whole lesion and deploy at adequate pressure.',
+    goal: 'Measure the vessel, size the stent to it, cover the whole lesion and deploy at adequate pressure.',
     subtasks: [
-      { id: 'ssize', label: 'Choose a stent size', check: (c) => c.stent.sized },
-      { id: 'spos', label: 'Position the stent to cover the lesion', check: (c) => c.stent.positioned },
-      { id: 'sdep', label: 'Deploy with pressure', check: (c) => c.stent.deployed },
+      { id: 'ssize', label: 'Measure the vessel (7) and load a stent', check: (c) => c.stent.sized },
+      { id: 'spos', label: 'Cover the whole lesion with the stent', check: (c) => c.stent.positioned },
+      { id: 'sdep', label: 'Deploy with pressure, then deflate', check: (c) => c.stent.deployed },
     ],
-    hint: () => 'Stent tools arrive in milestone 4.',
+    hint: (c) => {
+      const s = c.stent;
+      if (!s.measured) return 'Measure the vessel first: select Measure (7) and read the reference diameter and lesion length.';
+      if (c.activeTool !== 'stent') return 'Select the stent (4). Diameter about equal to the reference; length covering the lesion plus 2–3 mm each side.';
+      if (!s.out && !s.positioned) return 'Choose the stent size in the panel, then advance it over the wire (W).';
+      if (s.positioned && s.pressure > 0.3) return 'Stent expanding. Hold at pressure for a few seconds, then deflate (Q).';
+      if (s.positioned && s.deployed) return 'Deployed.';
+      if (s.positioned) return 'The lesion is covered. Hold E to deploy: at least nominal pressure (10 atm), no more than RBP (16 atm).';
+      const p = s.proximalMargin;
+      const d = s.distalMargin;
+      if (p !== null && d !== null) {
+        if (p < 0 && d < 0) return 'The stent is shorter than the lesion. Pull it back into the guide (S) and choose a longer one.';
+        if (d < 0) return `Advance ${(-d).toFixed(1)} mm more: the distal end of the lesion is not covered yet.`;
+        if (p < 0) return `Pull back ${(-p).toFixed(1)} mm: the proximal end of the lesion is not covered.`;
+      }
+      return 'Advance the stent towards the lesion.';
+    },
+    teach:
+      'Size the stent 1:1 with the reference (healthy) vessel diameter and choose a length that covers the lesion with 2–3 mm of healthy vessel at each end. Deploy at nominal pressure or higher: under-expansion is a leading cause of stent thrombosis and restenosis. Modern stents are drug-eluting (DES), which greatly reduces re-narrowing.',
   },
   {
     id: 'final',
     title: 'Final angiogram',
-    goal: 'Confirm brisk flow down the LAD and a good stent result.',
+    goal: 'Confirm brisk flow down the LAD and a good stent result in two projections.',
     subtasks: [
       { id: 'fangio', label: 'Inject contrast and check the flow', check: (c) => c.angiosAfterStent > 0 },
-      { id: 'fview', label: 'Confirm in a second projection', check: (c) => c.projectionsAfterStent > 1 },
+      { id: 'fview', label: 'Confirm in a second projection (V)', check: (c) => c.projectionsAfterStent > 1 },
     ],
-    hint: () => 'Final angiography arrives in milestone 4.',
+    hint: (c) => {
+      if (c.stent.out || c.balloon.out) return 'Pull the balloon back into the guide (S), then inject contrast (5).';
+      if (c.angiosAfterStent === 0) return 'Inject contrast (5) and watch how quickly the LAD fills now.';
+      return 'Change the projection (V) and inject again. Look for edge dissections and residual narrowing.';
+    },
+    teach:
+      'Check for TIMI 3 flow, less than 10–20% residual narrowing and no dissection at the stent edges, in at least two views. A single projection can hide problems.',
   },
 ];

@@ -61,6 +61,10 @@ export class Hud {
         <tr><td>Shift</td><td>Fine control</td></tr>
         <tr><td>Space · 6</td><td>Fluoro pedal (hold)</td></tr>
         <tr><td>5 · C</td><td>Contrast injection (cine)</td></tr>
+        <tr><td>E (hold) / Q</td><td>Inflate / deflate the balloon or stent</td></tr>
+        <tr><td>G</td><td>Give heparin</td></tr>
+        <tr><td>N</td><td>Monitor sound on / off</td></tr>
+        <tr><td>Esc</td><td>Pause</td></tr>
         <tr><td>Tab</td><td>3D view / fluoroscopy</td></tr>
         <tr><td>V · arrows</td><td>C-arm projection / angle</td></tr>
         <tr><td>F</td><td>Camera follows device tip</td></tr>

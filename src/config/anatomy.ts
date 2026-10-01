@@ -336,6 +336,33 @@ export const CONTRAST = {
 
 export const PHYSIOLOGY = {
   baselineHR: 72,
+  baselineSys: 128,
+  baselineDia: 76,
+  spo2: 98,
+  /** Activated clotting time (s) before and after a weight-based heparin bolus (70–100 U/kg). */
+  actBaseline: 128,
+  actHeparin: 285,
+  /** Seconds of LAD occlusion to reach full ischaemia (ST elevation typically appears within 10–30 s). */
+  ischemiaRiseSeconds: 20,
+  /** Recovery time constant after reperfusion (s). */
+  ischemiaRecoverySeconds: 8,
+  /** Maximum ST elevation in the anterior leads (mm) during complete LAD occlusion. */
+  maxStMm: 4,
+  /** Continuous occlusion beyond this (s) starts ventricular ectopy and a fall in blood pressure. */
+  ectopySeconds: 40,
+  /** Continuous occlusion beyond this (s) causes haemodynamic compromise. */
+  dangerSeconds: 60,
+};
+
+/**
+ * Flow (TIMI) model. Diameter stenosis below `freeDs` does not limit resting flow; above it,
+ * flow falls steeply until the vessel is (nearly) occluded at `occludedDs`.
+ */
+export const FLOW = {
+  freeDs: 0.6,
+  occludedDs: 0.98,
+  /** Downstream flow multiplier of an untreated (unsealed) dissection. */
+  dissectionPenalty: 0.45,
 };
 
 /** Background (fluoro only) skeleton: gives the X-ray image its landmarks. */
@@ -391,4 +418,50 @@ export const DEVICES = {
   },
   /** Contrast volume per injection (ml). */
   contrastMl: { selective: 8, aortic: 20 },
+  /**
+   * Semi-compliant pre-dilation balloon. Diameter grows ~1.5% per atm above nominal pressure.
+   * RBP = rated burst pressure (the manufacturer's safe upper limit).
+   */
+  balloon: {
+    diameters: [2.0, 2.5, 3.0, 3.5],
+    lengths: [12, 15, 20],
+    defaultSize: { d: 0, l: 1 },
+    nominalAtm: 8,
+    rbpAtm: 14,
+    compliancePerAtm: 0.015,
+    /** Elastic recoil after plain balloon angioplasty (fraction of the balloon diameter lost). */
+    recoil: 0.3,
+  },
+  /** Drug-eluting stent on its delivery balloon. */
+  stent: {
+    diameters: [2.5, 2.75, 3.0, 3.5, 4.0],
+    lengths: [12, 15, 18, 23, 28],
+    defaultSize: { d: 0, l: 0 },
+    nominalAtm: 10,
+    rbpAtm: 16,
+    compliancePerAtm: 0.012,
+    /** The stent is plastically expanded once the balloon passes this pressure (atm). */
+    expandAtm: 6,
+    /** Small acute recoil of a metal stent. */
+    recoil: 0.03,
+    /** Radius (mm) of a crimped stent on its balloon. */
+    crimpedRadius: 0.55,
+  },
+  /** Shared balloon-catheter mechanics. */
+  inflation: {
+    /** Pressure rise while the inflation device is screwed in (atm/s); Shift = fine. */
+    atmPerS: 3,
+    fineAtmPerS: 0.8,
+    /** Pressure fall while deflating (negative suction). */
+    deflateAtmPerS: 8,
+    /** Pressure above RBP at which the balloon ruptures. */
+    ruptureOverRbp: 4,
+    /** Achieved/reference diameter ratio above which the vessel wall tears (dissection). */
+    dissectionRatio: 1.2,
+    /** Radius of the folded (deflated) balloon and the catheter shaft (mm). */
+    foldedRadius: 0.45,
+    shaftRadius: 0.35,
+    speedMmPerS: 18,
+    fineSpeedMmPerS: 4,
+  },
 };

@@ -27,6 +27,11 @@ export interface ToolContext {
   wire: Guidewire;
   /** Current procedure stage (0-based). Tools unlock as stages are completed. */
   stageIndex: number;
+  heparin?: boolean;
+  balloon?: { out: boolean };
+  stentSys?: { out: boolean };
+  /** A selective angiogram has been taken (needed for QCA). */
+  angioTaken?: boolean;
 }
 
 const svgCursor = (body: string, hx = 12, hy = 12, fallback = 'crosshair'): string =>
@@ -65,7 +70,7 @@ export const TOOLS: ToolDef[] = [
     cursor: svgCursor(ring('#e6edf2') + `<path d='M12 7l3-3' stroke='#e6edf2' stroke-width='1.5'/>`),
     icon: icon('<path d="M3 21c5-2 7-6 9-10s4-7 7-7"/><path d="M19 4l2-1"/>'),
     rules: [
-      'Requires the guide engaged in the left main and a diagnostic angiogram.',
+      'Requires the guide engaged in the left main, a diagnostic angiogram and heparin (G).',
       'W/S or wheel: advance / retract. A/D: rotate the shaped tip.',
       'At each branch the tip direction picks the vessel. Watch the panel hint and the fluoro image.',
       'Cross the lesion slowly (Shift). Forcing a buckling wire can dissect the artery.',
@@ -79,7 +84,12 @@ export const TOOLS: ToolDef[] = [
     kind: 'modal',
     cursor: svgCursor(ring('#f0b429')),
     icon: icon('<path d="M2 12h4"/><rect x="6" y="9" width="11" height="6" rx="3"/><path d="M17 12h5"/>'),
-    rules: ['Requires the wire across the lesion into the distal LAD.', 'Position over the lesion, then inflate with the pressure dial (atm).'],
+    rules: [
+      'Requires the wire across the lesion into the distal LAD.',
+      'Choose a size in the panel (only while it is inside the guide). W/S or wheel: advance / retract along the wire.',
+      'Line the two radiopaque markers up across the lesion. Hold E to inflate (Shift = fine), Q to deflate.',
+      'Watch the gauge: nominal pressure gives the labelled size; above the rated burst pressure (RBP) the balloon may rupture.',
+    ],
   },
   {
     id: 'stent',
@@ -89,7 +99,12 @@ export const TOOLS: ToolDef[] = [
     kind: 'modal',
     cursor: svgCursor(ring('#9fb4c7')),
     icon: icon('<path d="M2 12h3"/><path d="M5 9l3 6 3-6 3 6 3-6 2 3-2 3"/><path d="M19 12h3"/>'),
-    rules: ['Requires the lesion to be pre-dilated.', 'Choose a size, position across the lesion, deploy with pressure.'],
+    rules: [
+      'Requires the lesion to be pre-dilated and the balloon back in the guide.',
+      'Measure first (7). Choose diameter ≈ reference, length = lesion + 2–3 mm each side.',
+      'Cover the whole lesion, hold E to deploy (nominal 10 atm, RBP 16 atm), then Q to deflate.',
+      'Re-inflating inside the stent at higher pressure post-dilates it.',
+    ],
   },
   {
     id: 'contrast',
@@ -123,7 +138,11 @@ export const TOOLS: ToolDef[] = [
     kind: 'modal',
     cursor: svgCursor(`<path d='M4 20L20 4M7 17l2 2M10 14l2 2M13 11l2 2M16 8l2 2' stroke='black' stroke-width='3'/><path d='M4 20L20 4M7 17l2 2M10 14l2 2M13 11l2 2M16 8l2 2' stroke='#5ee27a' stroke-width='1.3'/>`, 4, 20),
     icon: icon('<path d="M4 20L20 4"/><path d="M7 17l2 2M10 14l2 2M13 11l2 2M16 8l2 2"/>'),
-    rules: ['Shows reference vessel diameter and lesion length (QCA).'],
+    rules: [
+      'Quantitative coronary angiography (QCA) of the target lesion: reference diameter, minimal lumen diameter, % stenosis and lesion length.',
+      'In the 3D view, hover a coronary to read its diameter at that point.',
+      'Needs a selective angiogram first.',
+    ],
   },
 ];
 
@@ -138,12 +157,20 @@ export function toolAvailability(id: ToolId, ctx: ToolContext): { ok: boolean; r
     case 'wire':
       if (!ctx.guide.engaged) return { ok: false, reason: 'Engage the left main with the guide catheter first.' };
       if (ctx.stageIndex < 2) return { ok: false, reason: 'Take a diagnostic angiogram (5) first, so you can see where you are going.' };
+      if (ctx.heparin === false) return { ok: false, reason: 'Give heparin (G) before a wire goes into the coronary artery.' };
       return { ok: true };
     case 'contrast':
       return ctx.guide.inAorta ? { ok: true } : { ok: false, reason: 'The guide tip must be in the aorta to inject.' };
     case 'balloon':
+      if (ctx.stageIndex < 3) return { ok: false, reason: 'Cross the lesion and park the wire in the distal LAD first.' };
+      if (ctx.stentSys?.out) return { ok: false, reason: 'Pull the stent delivery system back into the guide first.' };
+      return { ok: true };
     case 'stent':
+      if (ctx.stageIndex < 4) return { ok: false, reason: 'Pre-dilate the lesion with the balloon first.' };
+      if (ctx.balloon?.out) return { ok: false, reason: 'Pull the balloon back into the guide first.' };
+      return { ok: true };
     case 'measure':
-      return { ok: false, reason: 'Coming in milestone 4.' };
+      if (ctx.angioTaken === false || ctx.stageIndex < 2) return { ok: false, reason: 'Take a selective angiogram first; QCA measures the contrast-filled vessel.' };
+      return { ok: true };
   }
 }
